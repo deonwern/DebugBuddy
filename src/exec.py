@@ -1,15 +1,10 @@
+import os
 import subprocess
 import sys
-from languages import get_language_by_extension
+from languages import get_lang_by_extension
 
 
-def exec_command(command, target_file=None):
-    timeout = 10
-    if target_file:
-        lang = get_language_by_extension(target_file)
-        if lang:
-            timeout = lang.timeout
-
+def exec_command(command, timeout=10):
     try:
         result = subprocess.run(
             command,
@@ -20,29 +15,52 @@ def exec_command(command, target_file=None):
             shell=True,
         )
         return (result.stdout, None)
+    except subprocess.TimeoutExpired as e:
+        return (
+            None,
+            f"Command timed out after {timeout} seconds.",
+        )
     except subprocess.CalledProcessError as e:
         return (None, e.stderr)
-    except subprocess.TimeoutExpired as e:
-        err_msg = (
-            e.stderr if e.stderr else f"Command timed out after {timeout} seconds."
-        )
-        return (None, err_msg)
 
 
-def run_command():
-    if len(sys.argv) < 2:
-        return (None, "Usage: python error_handler.py <command>")
+def get_data_by_extention(args):
+    for arg in args:
+        if os.path.isfile(arg):
+            lang = get_lang_by_extension(arg)
+            if lang is not None:
+                return (f"{lang.default_command(arg)}", lang.name, lang.timeout)
+    return (None, None, None)
 
-    command = " ".join(sys.argv[1:])
 
-    target_file = None
-    for arg in sys.argv[1:]:
-        if any(arg.endswith(ext) for ext in [".py", ".c", ".java"]):
-            target_file = arg
-            break
+def check_args(args):
+    if len(args) >= 2:
+        return False
+    return True
 
-    output, err = exec_command(command, target_file)
-    if err is not None:
-        return (None, err)
-    else:
-        return (output, None)
+
+def run_command(args):
+    if check_args(args):
+        print("Usage: python error_handler.py <file name>")
+        return (None, None)
+
+    ext_data = get_data_by_extention(args[1])
+    if ext_data is None:
+        print("Error: Unsupported file extension or invalid file provided.")
+        return (None, None)
+
+    command, name, timeout = ext_data
+
+    print(f"Language detected as: {name}")
+    print(f"Executing: {command}")
+
+    if command is not None:
+        if timeout is None:
+            timeout = 10
+        output, err = exec_command(command, timeout=timeout)
+        if err is not None:
+            return (None, err)
+        else:
+            return (output, None)
+
+    return (None, None)

@@ -3,60 +3,71 @@ import subprocess
 
 
 def translate_text(text, target_language="English"):
-    """
-    Translates AI response into target language.
-    Can be connected to a lightweight translation library or API.
-    """
     if not target_language or target_language.lower() == "english":
         return text
-
-    # Placeholder for translation integration (e.g., deep-translator or local LLM translation step)
-    return f"[Translated to {target_language}]:\n{text}"
+    return text
 
 
-st.set_page_config(page_title="DebugBuddy AI Assistant", layout="centered")
+def get_local_llm_model():
+    return "qwen2.5-coder:1.5b"
 
-st.title("🤖 DebugBuddy AI Assistant")
-st.markdown("Your local AI companion for debugging code diagnostics.")
 
-# Sidebar options
-st.sidebar.header("Configuration")
-target_lang = st.sidebar.selectbox(
-    "Preferred Language",
-    ["English", "Spanish", "French", "German", "Chinese", "Japanese", "Korean"],
-    index=0,
-)
-model_name = st.sidebar.text_input("Local LLM Model (Ollama)", value="llama3")
+def main():
+    st.set_page_config(page_title="DebugBuddy AI Assistant", layout="centered")
 
-# Session state initialization for error payload
-if "error_payload" not in st.session_state:
-    st.session_state.error_payload = ""
+    if "error_payload" not in st.session_state:
+        st.session_state.error_payload = ""
 
-st.markdown("### Error Context Payload")
-payload_input = st.text_area(
-    "Paste or auto-loaded error payload:",
-    value=st.session_state.error_payload,
-    height=150,
-)
+    st.title("🤖 DebugBuddy AI Assistant")
+    st.markdown("Your local AI companion for debugging code diagnostics.")
 
-if st.button("Ask Local AI"):
-    if not payload_input.strip():
-        st.warning("Please provide an error payload first.")
-    else:
-        with st.spinner("Consulting local LLM (Ollama)..."):
-            try:
-                # Query local Ollama model
+    st.sidebar.header("Configuration")
+    target_lang = st.sidebar.selectbox(
+        "Preferred Language",
+        ["English", "Spanish", "French", "German", "Chinese", "Japanese", "Korean"],
+        index=0,
+    )
+    model_name = st.sidebar.text_input(
+        "Local LLM Model (Ollama)", value=get_local_llm_model()
+    )
+
+    payload_input = st.text_area(
+        "Paste or auto-loaded error payload:",
+        value=st.session_state.error_payload,
+        height=150,
+    )
+
+    st.session_state.error_payload = payload_input
+
+    if payload_input.strip():
+        try:
+            with st.spinner(f"Consulting local LLM ({model_name})..."):
                 result = subprocess.run(
                     ["ollama", "run", model_name, payload_input],
                     capture_output=True,
                     text=True,
                     check=True,
-                    timeout=30,
+                    timeout=45,
                 )
                 raw_response = result.stdout
                 translated_response = translate_text(raw_response, target_lang)
 
                 st.markdown("### 💡 AI Solution")
                 st.success(translated_response)
-            except Exception as e:
-                st.error(f"Failed to communicate with local LLM (`ollama`): {e}")
+        except subprocess.TimeoutExpired:
+            st.error("LLM took too long to respond.")
+        except subprocess.CalledProcessError as e:
+            st.error(f"Failed to communicate with local LLM `ollama`: {e}")
+        except Exception as e:
+            st.error(f"Error processing the error payload: {e}")
+    else:
+        st.warning("Please provide an error payload first.")
+
+    st.sidebar.header("Tools")
+    if st.sidebar.button("Clear Payload"):
+        st.session_state.error_payload = ""
+        st.rerun()
+
+
+if __name__ == "__main__":
+    main()

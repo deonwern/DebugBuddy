@@ -30,10 +30,11 @@ def parse_and_process_errors(stderr_output):
         return []
 
     all_errors = []
-    for parser in get_all_languages():
+    for lang_class in get_all_languages():
+        parser = lang_class()  # Instantiate the language class
         errors = parser.match_errors(stderr_output)
         for err in errors:
-            err["suggestion"] = parser.get_suggestion(err["message"])
+            # Suggestion is already populated by match_errors via resolve_suggestion
             err["context"] = extract_code_context(err["file"], err["line"])
             all_errors.append(err)
 
@@ -65,4 +66,5 @@ def render_rust_style(error):
         print(f"    {CYAN}|{RESET} [Source code snippet unavailable]")
 
     print(f"   {CYAN}|{RESET}")
-    print(f"   {YELLOW}= note{RESET}: {error['suggestion']}")
+    if error.get("suggestion"):
+        print(f"    {YELLOW}= note{RESET}: {error['suggestion']}")
