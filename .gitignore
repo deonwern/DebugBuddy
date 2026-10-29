@@ -1,5 +1,4 @@
-venv/
-__pycache__/
-.env
-.agents/
-.claude/
+# Added by cargo
+
+/target
+Cargo.lock
